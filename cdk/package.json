@@ -1,0 +1,33 @@
+{
+  "name": "s3-wire-cdk",
+  "version": "1.0.0",
+  "description": "AWS CDK infrastructure for S3-Wire serverless file upload system",
+  "bin": {
+    "s3-wire-cdk": "bin/s3-wire-app.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "watch": "tsc -w",
+    "test": "jest",
+    "cdk": "cdk"
+  },
+  "keywords": [
+    "aws",
+    "cdk",
+    "s3",
+    "serverless",
+    "file-upload"
+  ],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "aws-cdk": "^2.110.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.3.3"
+  },
+  "dependencies": {
+    "aws-cdk-lib": "^2.110.0",
+    "constructs": "^10.3.0"
+  }
+}
