@@ -58,30 +58,25 @@ def create_presigned_url(
         bucket_name: Nombre del bucket de almacenamiento
         object_key: Key del objeto en S3
         expiration: Tiempo de expiración en segundos
-        max_size: Tamaño máximo del archivo en bytes (opcional)
-        content_type: Content-Type permitido (opcional)
+        max_size: Tamaño máximo del archivo en bytes (opcional, validado en cliente)
+        content_type: Content-Type permitido (opcional, validado en cliente)
     
     Returns:
         URL pre-firmada como string
+    
+    Nota:
+        Las restricciones de tamaño y tipo se validan en el cliente (JavaScript).
+        Para restricciones del lado del servidor, usar generate_presigned_post.
     """
     params = {
         'Bucket': bucket_name,
         'Key': object_key,
     }
     
-    # Condiciones adicionales para la URL pre-firmada
-    conditions = []
-    
-    if max_size:
-        # Limitar tamaño máximo del archivo
-        conditions.append(['content-length-range', 0, max_size])
-    
-    if content_type:
-        # Restringir Content-Type
-        conditions.append(['eq', '$Content-Type', content_type])
-    
     try:
         # Generar URL pre-firmada para PUT
+        # Nota: generate_presigned_url no soporta conditions complejas
+        # Las validaciones de tamaño y tipo se hacen en el cliente
         presigned_url = s3_client.generate_presigned_url(
             'put_object',
             Params=params,
@@ -255,6 +250,13 @@ Ejemplos:
         help='Región de AWS (default: región por defecto de AWS CLI)'
     )
     
+    parser.add_argument(
+        '--protocol',
+        choices=['http', 'https'],
+        default='https',
+        help='Protocolo para la URL (default: https)'
+    )
+    
     return parser.parse_args()
 
 
@@ -319,7 +321,7 @@ def main():
     )
     
     # Construir URL completa
-    upload_link = f'http://{args.domain}/u/{short_id}/'
+    upload_link = f'{args.protocol}://{args.domain}/u/{short_id}/'
     
     # Mostrar resultado
     print("\n" + "=" * 60)
