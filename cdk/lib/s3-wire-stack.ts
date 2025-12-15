@@ -161,15 +161,12 @@ export class S3WireStack extends cdk.Stack {
       );
 
       // Crear registro A Alias apuntando al S3 Website Endpoint
-      new route53.ARecord(this, 'WebsiteAliasRecord', {
-        zone: hostedZone,
-        recordName: props.domain,
-        target: route53.RecordTarget.fromAlias({
-          bind: () => ({
-            dnsName: this.hostingBucket.bucketWebsiteDomainName,
-            hostedZoneId: this.hostingBucket.bucketWebsiteHostedZoneId || '',
-          }),
-        }),
+      // Nota: Para Route53, necesitamos usar un Custom Resource o configurar manualmente
+      // debido a limitaciones de CDK con S3 Website Hosting
+      // Por ahora, documentamos el dominio del bucket en los outputs para configuración manual
+      new cdk.CfnOutput(this, 'Route53Instructions', {
+        value: `Crea un registro CNAME en Route53 apuntando ${props.domain} a ${this.hostingBucket.bucketWebsiteDomainName}`,
+        description: 'Instrucciones para configurar Route53 manualmente',
       });
     }
 
