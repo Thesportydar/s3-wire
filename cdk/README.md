@@ -87,6 +87,12 @@ cdk deploy \
 
 El stack creará un certificado ACM nuevo con validación DNS automática.
 
+**⚠️ NOTA IMPORTANTE sobre Regiones:**
+- Los certificados ACM para CloudFront **DEBEN estar en us-east-1**
+- Si su stack está en **us-east-1**, el certificado se creará automáticamente
+- Si su stack está en **otra región**, debe proporcionar un `certificateArn` de un certificado existente en us-east-1
+- Para crear un certificado manualmente en us-east-1, use la consola de ACM o AWS CLI
+
 #### Parámetros:
 - `domain`: Subdominio completo para el hosting bucket (ej: `up.mydomain.com`)
 - `hostedZoneId`: ID de la Hosted Zone en Route53

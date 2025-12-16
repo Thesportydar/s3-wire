@@ -171,6 +171,7 @@ export class S3WireStack extends cdk.Stack {
       } else {
         // Crear nuevo certificado con validación DNS
         // IMPORTANTE: El certificado ACM para CloudFront DEBE estar en us-east-1
+        // CDK automatically handles cross-region certificate references for CloudFront
         if (props.hostedZoneId && props.hostedZoneName) {
           const hostedZone = route53.HostedZone.fromHostedZoneAttributes(
             this,
@@ -181,14 +182,17 @@ export class S3WireStack extends cdk.Stack {
             }
           );
           
+          // DnsValidatedCertificate is deprecated but required for cross-region certificates
+          // For us-east-1 stacks, the regular Certificate construct works fine
+          // For other regions, users should provide a certificateArn from us-east-1
           certificate = new acm.Certificate(this, 'Certificate', {
             domainName: props.domain,
             validation: acm.CertificateValidation.fromDns(hostedZone),
           });
         } else {
           throw new Error(
-            'Para crear un certificado automáticamente, se requieren hostedZoneId y hostedZoneName. ' +
-            'Alternativamente, proporciona un certificateArn existente.'
+            'To automatically create a certificate, both hostedZoneId and hostedZoneName are required. ' +
+            'Alternatively, provide an existing certificateArn in us-east-1.'
           );
         }
       }

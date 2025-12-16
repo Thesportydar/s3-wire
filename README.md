@@ -128,6 +128,7 @@ cdk deploy \
 - El certificado ACM para CloudFront **DEBE estar en us-east-1**
 - Cuando se especifica un `domain`, se crea CloudFront con HTTPS automáticamente
 - Sin `domain`, solo se despliega S3 Website Hosting (HTTP - no recomendado para producción)
+- Si el stack está en una región diferente a us-east-1, proporcione un `certificateArn` existente en us-east-1
 
 ### 2. Bootstrap de CDK (primera vez)
 
