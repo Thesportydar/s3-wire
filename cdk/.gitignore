@@ -1,0 +1,22 @@
+# CDK asset staging directory
+.cdk.staging
+cdk.out
+
+# Node
+node_modules/
+*.js
+!jest.config.js
+*.d.ts
+
+# TypeScript cache
+*.tsbuildinfo
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+
+# Logs
+*.log

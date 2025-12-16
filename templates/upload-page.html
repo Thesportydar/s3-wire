@@ -1,0 +1,493 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="robots" content="noindex, nofollow">
+    <title>Subir Archivo - S3 Wire</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            max-width: 600px;
+            width: 100%;
+            padding: 40px;
+        }
+
+        h1 {
+            color: #333;
+            font-size: 28px;
+            margin-bottom: 10px;
+            text-align: center;
+        }
+
+        .subtitle {
+            color: #666;
+            text-align: center;
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+
+        .info-box {
+            background: #f8f9fa;
+            border-left: 4px solid #667eea;
+            padding: 15px;
+            margin-bottom: 30px;
+            border-radius: 4px;
+        }
+
+        .info-box p {
+            color: #555;
+            font-size: 14px;
+            line-height: 1.6;
+            margin: 5px 0;
+        }
+
+        .info-box strong {
+            color: #333;
+        }
+
+        .upload-area {
+            border: 3px dashed #ddd;
+            border-radius: 8px;
+            padding: 60px 20px;
+            text-align: center;
+            transition: all 0.3s ease;
+            cursor: pointer;
+            background: #fafafa;
+        }
+
+        .upload-area:hover {
+            border-color: #667eea;
+            background: #f0f2ff;
+        }
+
+        .upload-area.drag-over {
+            border-color: #667eea;
+            background: #e8ebff;
+            transform: scale(1.02);
+        }
+
+        .upload-icon {
+            font-size: 64px;
+            margin-bottom: 20px;
+            opacity: 0.5;
+        }
+
+        .upload-text {
+            color: #666;
+            font-size: 18px;
+            margin-bottom: 10px;
+        }
+
+        .upload-hint {
+            color: #999;
+            font-size: 14px;
+        }
+
+        input[type="file"] {
+            display: none;
+        }
+
+        .progress-container {
+            display: none;
+            margin-top: 30px;
+        }
+
+        .progress-bar-bg {
+            background: #e0e0e0;
+            border-radius: 10px;
+            height: 20px;
+            overflow: hidden;
+        }
+
+        .progress-bar {
+            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+            height: 100%;
+            width: 0%;
+            transition: width 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 12px;
+            font-weight: bold;
+        }
+
+        .status-message {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 6px;
+            display: none;
+            text-align: center;
+            font-weight: 500;
+        }
+
+        .status-message.success {
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+            display: block;
+        }
+
+        .status-message.error {
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+            display: block;
+        }
+
+        .status-message.info {
+            background: #d1ecf1;
+            border: 1px solid #bee5eb;
+            color: #0c5460;
+            display: block;
+        }
+
+        .file-info {
+            display: none;
+            margin-top: 20px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 6px;
+        }
+
+        .file-info p {
+            color: #555;
+            margin: 5px 0;
+            font-size: 14px;
+        }
+
+        .spinner {
+            display: none;
+            margin: 20px auto;
+            width: 40px;
+            height: 40px;
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .footer {
+            margin-top: 30px;
+            text-align: center;
+            color: #999;
+            font-size: 12px;
+        }
+
+        @media (max-width: 600px) {
+            .container {
+                padding: 30px 20px;
+            }
+
+            h1 {
+                font-size: 24px;
+            }
+
+            .upload-area {
+                padding: 40px 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📤 Subir Archivo</h1>
+        <p class="subtitle">Arrastra y suelta tu archivo o haz clic para seleccionar</p>
+
+        <div class="info-box">
+            <p><strong>ℹ️ Información:</strong></p>
+            <p>• Tamaño máximo: <span id="max-size-display">100</span> MB</p>
+            <p>• Tipos permitidos: <span id="types-display">Todos</span></p>
+            <p>• Este link expira el: <strong>{EXPIRY_DATE}</strong></p>
+        </div>
+
+        <div class="upload-area" id="uploadArea">
+            <div class="upload-icon">☁️</div>
+            <p class="upload-text">Arrastra tu archivo aquí</p>
+            <p class="upload-hint">o haz clic para seleccionar</p>
+            <input type="file" id="fileInput" accept="{ALLOWED_TYPES}">
+        </div>
+
+        <div class="file-info" id="fileInfo">
+            <p><strong>Archivo seleccionado:</strong></p>
+            <p id="fileName">-</p>
+            <p id="fileSize">-</p>
+        </div>
+
+        <div class="progress-container" id="progressContainer">
+            <div class="progress-bar-bg">
+                <div class="progress-bar" id="progressBar">0%</div>
+            </div>
+        </div>
+
+        <div class="spinner" id="spinner"></div>
+
+        <div class="status-message" id="statusMessage"></div>
+
+        <div class="footer">
+            <p>🔒 Conexión segura • Link de un solo uso</p>
+        </div>
+    </div>
+
+    <script>
+        // Configuración inyectada por el script Python
+        const CONFIG = {
+            presignedUrl: '{PRESIGNED_URL}',
+            maxFileSize: parseInt('{MAX_FILE_SIZE}'),
+            allowedTypes: '{ALLOWED_TYPES}'.split(',').map(t => t.trim()),
+            expiryDate: '{EXPIRY_DATE}'
+        };
+
+        // Referencias a elementos del DOM
+        const uploadArea = document.getElementById('uploadArea');
+        const fileInput = document.getElementById('fileInput');
+        const fileInfo = document.getElementById('fileInfo');
+        const fileName = document.getElementById('fileName');
+        const fileSize = document.getElementById('fileSize');
+        const progressContainer = document.getElementById('progressContainer');
+        const progressBar = document.getElementById('progressBar');
+        const statusMessage = document.getElementById('statusMessage');
+        const spinner = document.getElementById('spinner');
+        const maxSizeDisplay = document.getElementById('max-size-display');
+        const typesDisplay = document.getElementById('types-display');
+
+        // Variables de estado
+        let selectedFile = null;
+        let isUploading = false;
+
+        // Inicialización
+        function init() {
+            // Mostrar información
+            maxSizeDisplay.textContent = (CONFIG.maxFileSize / (1024 * 1024)).toFixed(1);
+            
+            if (CONFIG.allowedTypes.length === 1 && CONFIG.allowedTypes[0] === '*/*') {
+                typesDisplay.textContent = 'Todos los tipos';
+            } else {
+                typesDisplay.textContent = CONFIG.allowedTypes.join(', ');
+            }
+
+            // Event listeners
+            uploadArea.addEventListener('click', () => fileInput.click());
+            fileInput.addEventListener('change', handleFileSelect);
+            
+            // Drag and drop
+            uploadArea.addEventListener('dragover', handleDragOver);
+            uploadArea.addEventListener('dragleave', handleDragLeave);
+            uploadArea.addEventListener('drop', handleDrop);
+        }
+
+        // Manejo de selección de archivo
+        function handleFileSelect(event) {
+            const file = event.target.files[0];
+            if (file) {
+                processFile(file);
+            }
+        }
+
+        // Manejo de drag over
+        function handleDragOver(event) {
+            event.preventDefault();
+            event.stopPropagation();
+            uploadArea.classList.add('drag-over');
+        }
+
+        // Manejo de drag leave
+        function handleDragLeave(event) {
+            event.preventDefault();
+            event.stopPropagation();
+            uploadArea.classList.remove('drag-over');
+        }
+
+        // Manejo de drop
+        function handleDrop(event) {
+            event.preventDefault();
+            event.stopPropagation();
+            uploadArea.classList.remove('drag-over');
+            
+            const file = event.dataTransfer.files[0];
+            if (file) {
+                processFile(file);
+            }
+        }
+
+        // Procesar archivo seleccionado
+        function processFile(file) {
+            // Validar tamaño
+            if (file.size > CONFIG.maxFileSize) {
+                showError(`El archivo es demasiado grande. Máximo permitido: ${(CONFIG.maxFileSize / (1024 * 1024)).toFixed(1)} MB`);
+                return;
+            }
+
+            // Validar tipo (si no es */* permitir todos)
+            if (CONFIG.allowedTypes[0] !== '*/*') {
+                const fileType = file.type;
+                const isAllowed = CONFIG.allowedTypes.some(allowedType => {
+                    if (allowedType.endsWith('/*')) {
+                        const category = allowedType.split('/')[0];
+                        return fileType.startsWith(category + '/');
+                    }
+                    return fileType === allowedType;
+                });
+
+                if (!isAllowed) {
+                    showError(`Tipo de archivo no permitido. Tipos aceptados: ${CONFIG.allowedTypes.join(', ')}`);
+                    return;
+                }
+            }
+
+            selectedFile = file;
+            
+            // Mostrar información del archivo
+            fileName.textContent = file.name;
+            fileSize.textContent = formatFileSize(file.size);
+            fileInfo.style.display = 'block';
+            
+            // Iniciar upload automáticamente
+            uploadFile();
+        }
+
+        // Subir archivo a S3
+        async function uploadFile() {
+            if (!selectedFile || isUploading) return;
+
+            isUploading = true;
+            uploadArea.style.display = 'none';
+            fileInfo.style.display = 'none';
+            progressContainer.style.display = 'block';
+            spinner.style.display = 'block';
+            hideStatus();
+
+            try {
+                const xhr = new XMLHttpRequest();
+
+                // Progress
+                xhr.upload.addEventListener('progress', (event) => {
+                    if (event.lengthComputable) {
+                        const percentComplete = Math.round((event.loaded / event.total) * 100);
+                        updateProgress(percentComplete);
+                    }
+                });
+
+                // Completado
+                xhr.addEventListener('load', () => {
+                    spinner.style.display = 'none';
+                    
+                    if (xhr.status === 200) {
+                        showSuccess('✅ ¡Archivo subido exitosamente!');
+                        progressBar.style.background = 'linear-gradient(90deg, #28a745 0%, #20c997 100%)';
+                    } else {
+                        showError(`❌ Error al subir archivo. Código: ${xhr.status}`);
+                        resetUpload();
+                    }
+                });
+
+                // Error
+                xhr.addEventListener('error', () => {
+                    spinner.style.display = 'none';
+                    showError('❌ Error de red. Por favor, intenta de nuevo.');
+                    resetUpload();
+                });
+
+                // Timeout
+                xhr.addEventListener('timeout', () => {
+                    spinner.style.display = 'none';
+                    showError('❌ Tiempo de espera agotado. Por favor, intenta de nuevo.');
+                    resetUpload();
+                });
+
+                // Configurar y enviar
+                xhr.open('PUT', CONFIG.presignedUrl, true);
+                xhr.setRequestHeader('Content-Type', selectedFile.type || 'application/octet-stream');
+                xhr.timeout = 300000; // 5 minutos
+                xhr.send(selectedFile);
+
+            } catch (error) {
+                spinner.style.display = 'none';
+                showError('❌ Error inesperado: ' + error.message);
+                resetUpload();
+            }
+        }
+
+        // Actualizar barra de progreso
+        function updateProgress(percent) {
+            progressBar.style.width = percent + '%';
+            progressBar.textContent = percent + '%';
+        }
+
+        // Mostrar mensaje de éxito
+        function showSuccess(message) {
+            statusMessage.textContent = message;
+            statusMessage.className = 'status-message success';
+        }
+
+        // Mostrar mensaje de error
+        function showError(message) {
+            statusMessage.textContent = message;
+            statusMessage.className = 'status-message error';
+        }
+
+        // Mostrar mensaje de info
+        function showInfo(message) {
+            statusMessage.textContent = message;
+            statusMessage.className = 'status-message info';
+        }
+
+        // Ocultar mensaje de estado
+        function hideStatus() {
+            statusMessage.style.display = 'none';
+            statusMessage.className = 'status-message';
+        }
+
+        // Formatear tamaño de archivo
+        function formatFileSize(bytes) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
+        }
+
+        // Resetear upload
+        function resetUpload() {
+            isUploading = false;
+            progressContainer.style.display = 'none';
+            uploadArea.style.display = 'block';
+            fileInfo.style.display = 'none';
+            selectedFile = null;
+            fileInput.value = '';
+            updateProgress(0);
+        }
+
+        // Iniciar cuando el DOM esté listo
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', init);
+        } else {
+            init();
+        }
+    </script>
+</body>
+</html>
