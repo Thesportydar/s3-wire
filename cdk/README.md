@@ -8,9 +8,11 @@ La infraestructura despliega:
 
 - **Bucket de Almacenamiento**: Para archivos subidos (`inbox/` prefix)
 - **Bucket de Hosting Estático**: Para páginas HTML efímeras (`u/` prefix)
+- **CloudFront Distribution (Opcional)**: CDN con HTTPS cuando se especifica un dominio
+- **Certificado ACM (Opcional)**: SSL/TLS para el dominio personalizado
 - **Políticas de Acceso**: Configuración de permisos y CORS
 - **Lifecycle Rules**: Eliminación automática de páginas HTML después de 7 días
-- **Route53 (Opcional)**: Registro DNS para dominio personalizado
+- **Route53 (Opcional)**: Registro DNS A Alias apuntando a CloudFront
 
 ## 🚀 Requisitos Previos
 
@@ -60,9 +62,21 @@ Sin dominio personalizado:
 cdk deploy
 ```
 
-### 4. Despliegue con Dominio Personalizado
+### 4. Despliegue con Dominio Personalizado y CloudFront (HTTPS)
 
-Con Route53:
+#### Opción A: Usar certificado ACM existente (recomendado para producción)
+
+```bash
+cdk deploy \
+  -c domain=up.mydomain.com \
+  -c hostedZoneId=Z1234567890ABC \
+  -c hostedZoneName=mydomain.com \
+  -c certificateArn=arn:aws:acm:us-east-1:123456789012:certificate/abc-123
+```
+
+**IMPORTANTE:** El certificado ACM para CloudFront **DEBE estar en us-east-1**, independientemente de la región del stack.
+
+#### Opción B: Crear nuevo certificado automáticamente
 
 ```bash
 cdk deploy \
@@ -71,10 +85,19 @@ cdk deploy \
   -c hostedZoneName=mydomain.com
 ```
 
-Parámetros:
+El stack creará un certificado ACM nuevo con validación DNS automática.
+
+**⚠️ NOTA IMPORTANTE sobre Regiones:**
+- Los certificados ACM para CloudFront **DEBEN estar en us-east-1**
+- Si su stack está en **us-east-1**, el certificado se creará automáticamente
+- Si su stack está en **otra región**, debe proporcionar un `certificateArn` de un certificado existente en us-east-1
+- Para crear un certificado manualmente en us-east-1, use la consola de ACM o AWS CLI
+
+#### Parámetros:
 - `domain`: Subdominio completo para el hosting bucket (ej: `up.mydomain.com`)
 - `hostedZoneId`: ID de la Hosted Zone en Route53
 - `hostedZoneName`: Nombre de la zona DNS (ej: `mydomain.com`)
+- `certificateArn` (opcional): ARN de certificado ACM existente en us-east-1
 
 ### 5. Ver Diferencias antes de Desplegar
 
@@ -86,11 +109,21 @@ cdk diff
 
 Después del despliegue, CDK mostrará:
 
+### Sin CloudFront (despliegue básico):
 - **StorageBucketName**: Nombre del bucket de almacenamiento
 - **HostingBucketName**: Nombre del bucket de hosting
-- **WebsiteURL**: URL del sitio web estático de S3
+- **WebsiteURL**: URL del sitio web estático de S3 (HTTP)
 - **HostingBucketDomain**: Dominio del bucket para configurar DNS
 - **HostingBucketRegionalDomain**: Dominio regional del bucket
+
+### Con CloudFront (dominio personalizado con HTTPS):
+- **StorageBucketName**: Nombre del bucket de almacenamiento
+- **HostingBucketName**: Nombre del bucket de hosting
+- **CloudFrontDistributionId**: ID de la distribución CloudFront (ej: E1234ABCD5678)
+- **CloudFrontDomainName**: Dominio CloudFront (ej: d111111abcdef8.cloudfront.net)
+- **WebsiteURL**: URL del sitio web con HTTPS (ej: https://up.mydomain.com)
+- **HostingBucketDomain**: Dominio del bucket (referencia)
+- **HostingBucketRegionalDomain**: Dominio regional del bucket (referencia)
 
 Guarda estos valores para usarlos con el script de generación de links.
 
@@ -155,6 +188,30 @@ cdk/
 - **CORS**: Configurado para GET/HEAD desde cualquier origen
 - **Lifecycle**: Eliminar objetos en `u/` después de 7 días
 
+### CloudFront Distribution (cuando se especifica dominio)
+
+- **Propósito**: CDN con HTTPS para servir el sitio web
+- **Origin**: S3 Website Endpoint del bucket de hosting
+- **Origin Protocol**: HTTP_ONLY (S3 Website solo soporta HTTP)
+- **Viewer Protocol Policy**: REDIRECT_TO_HTTPS (fuerza HTTPS)
+- **Compression**: Habilitada
+- **Security Policy**: TLS_V1_2_2021
+- **SSL Method**: SNI
+- **Error Handling**: 404 → /404.html
+- **Certificado**: ACM (existente o creado automáticamente)
+
+### Certificado ACM (cuando se crea automáticamente)
+
+- **Región**: us-east-1 (requerido por CloudFront)
+- **Validación**: DNS automática via Route53
+- **Dominio**: El especificado en el parámetro `domain`
+
+### Route53 A Record (cuando se proporciona dominio y hosted zone)
+
+- **Tipo**: A Alias
+- **Target**: CloudFront Distribution (o S3 Website si no hay CloudFront)
+- **Dominio**: El especificado en el parámetro `domain`
+
 ## 🔒 Seguridad
 
 ### Consideraciones Implementadas
@@ -164,6 +221,19 @@ cdk/
 3. **CORS Restrictivo**: Solo métodos necesarios permitidos
 4. **Lifecycle Automático**: Páginas HTML se eliminan automáticamente
 5. **Políticas de Bucket**: Permisos mínimos necesarios
+6. **HTTPS End-to-End**: CloudFront con certificado SSL/TLS (cuando se usa dominio)
+7. **Protección MITM**: Todo el tráfico cifrado previene intercepción de URLs pre-firmadas
+
+### 🔒 Mejora de seguridad: HTTPS con CloudFront
+
+Cuando se despliega con un dominio personalizado, CloudFront proporciona HTTPS:
+- ✅ **Previene ataques MITM**: El HTML se sirve cifrado por HTTPS
+- ✅ **Protege las URLs pre-firmadas**: Durante la carga de la página inicial
+- ✅ **Mejora performance**: CDN edge locations más cercanas al usuario
+- ✅ **Incluido en AWS Free Tier**: 1TB/mes transferencia, 10M requests
+- ✅ **TLS 1.2+**: Protocolo de seguridad moderno
+
+**Nota**: Sin CloudFront, S3 Static Website Hosting solo soporta HTTP, lo que permite que un atacante MITM intercepte la página HTML y capture las URLs pre-firmadas expuestas en el código JavaScript.
 
 ### Mejoras Recomendadas para Producción
 

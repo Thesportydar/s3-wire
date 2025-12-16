@@ -8,42 +8,62 @@ S3-Wire permite a usuarios externos subir archivos a Amazon S3 mediante URLs cor
 
 ## 🏗️ Arquitectura del Sistema
 
+### Arquitectura con HTTPS (Recomendada para Producción)
+
 ```
 ┌─────────────┐
 │   Usuario   │
 └──────┬──────┘
        │
-       │ 1. Accede al link corto
+       │ 1. Accede al link corto (HTTPS)
        ▼
-┌──────────────────────────┐
-│  S3 Static Website       │
-│  (up.mydomain.com)       │
-│  /u/{short-id}/index.html│
-└──────┬───────────────────┘
+┌────────────────────────────────┐
+│  CloudFront Distribution       │
+│  (https://up.mydomain.com)     │
+│  + Certificado SSL/TLS (ACM)   │
+└──────┬─────────────────────────┘
        │
-       │ 2. Upload directo con URL pre-firmada
+       │ 2. Origin: S3 Website (HTTP interno)
        ▼
-┌──────────────────────────┐
-│  S3 Storage Bucket       │
-│  inbox/{filename}        │
-└──────────────────────────┘
+┌────────────────────────────────┐
+│  S3 Static Website Hosting     │
+│  Bucket: up.mydomain.com       │
+│  /u/{short-id}/index.html      │
+└──────┬─────────────────────────┘
+       │
+       │ 3. Upload directo con URL pre-firmada (HTTPS)
+       ▼
+┌────────────────────────────────┐
+│  S3 Storage Bucket             │
+│  inbox/{filename}              │
+└────────────────────────────────┘
+
+Route53:
+┌────────────────────────────────┐
+│  A Record (Alias)              │
+│  up.mydomain.com →             │
+│  CloudFront Distribution       │
+└────────────────────────────────┘
 
 Gestión de Links:
-┌──────────────────────────┐
-│  Script Python           │
-│  - Genera ID corto       │
-│  - Crea URL pre-firmada  │
-│  - Sube página HTML      │
-└──────────────────────────┘
+┌────────────────────────────────┐
+│  Script Python                 │
+│  - Genera ID corto             │
+│  - Crea URL pre-firmada        │
+│  - Sube página HTML            │
+└────────────────────────────────┘
 ```
 
 ### Componentes:
 
-1. **Bucket de Almacenamiento**: Almacena los archivos subidos en `inbox/`
-2. **Bucket de Hosting Estático**: Sirve las páginas HTML efímeras en `u/{short-id}/`
-3. **URLs Pre-firmadas**: Permiten upload directo a S3 con permisos temporales
-4. **Lifecycle Rules**: Eliminan automáticamente las páginas HTML después de 7 días
-5. **Script Python**: Genera los links y páginas HTML personalizadas
+1. **CloudFront Distribution**: CDN con HTTPS para servir el sitio web de forma segura
+2. **Certificado ACM**: SSL/TLS para el dominio personalizado (región us-east-1)
+3. **Bucket de Almacenamiento**: Almacena los archivos subidos en `inbox/`
+4. **Bucket de Hosting Estático**: Sirve las páginas HTML efímeras en `u/{short-id}/`
+5. **URLs Pre-firmadas**: Permiten upload directo a S3 con permisos temporales
+6. **Route53**: Registro DNS A Alias apuntando al CloudFront Distribution
+7. **Lifecycle Rules**: Eliminan automáticamente las páginas HTML después de 7 días
+8. **Script Python**: Genera los links y páginas HTML personalizadas
 
 ## 📦 Requisitos Previos
 
@@ -87,12 +107,28 @@ Edita `cdk/cdk.json` o pasa parámetros por contexto:
 ```bash
 cd cdk
 
-# Opción 1: Despliegue básico
+# Opción 1: Despliegue básico (HTTP - solo desarrollo)
 cdk deploy
 
-# Opción 2: Con dominio personalizado
-cdk deploy -c domain=up.mydomain.com -c hostedZoneId=Z1234567890ABC
+# Opción 2: Con dominio personalizado y HTTPS usando certificado existente (RECOMENDADO)
+cdk deploy \
+  -c domain=up.mydomain.com \
+  -c hostedZoneId=Z1234567890ABC \
+  -c hostedZoneName=mydomain.com \
+  -c certificateArn=arn:aws:acm:us-east-1:123456789012:certificate/abc-123
+
+# Opción 3: Con dominio personalizado y HTTPS - certificado nuevo
+cdk deploy \
+  -c domain=up.mydomain.com \
+  -c hostedZoneId=Z1234567890ABC \
+  -c hostedZoneName=mydomain.com
 ```
+
+**IMPORTANTE:** 
+- El certificado ACM para CloudFront **DEBE estar en us-east-1**
+- Cuando se especifica un `domain`, se crea CloudFront con HTTPS automáticamente
+- Sin `domain`, solo se despliega S3 Website Hosting (HTTP - no recomendado para producción)
+- Si el stack está en una región diferente a us-east-1, proporcione un `certificateArn` existente en us-east-1
 
 ### 2. Bootstrap de CDK (primera vez)
 
@@ -185,16 +221,33 @@ aws s3 cp s3://STORAGE-BUCKET/inbox/archivo.pdf ./
 
 ## 🔐 Consideraciones de Seguridad
 
+### 🔒 Mejora de Seguridad: HTTPS con CloudFront
+
+Cuando se despliega con un dominio personalizado, CloudFront proporciona **HTTPS end-to-end**:
+
+- ✅ **Previene ataques MITM**: El HTML se sirve cifrado por HTTPS, no como texto plano
+- ✅ **Protege las URLs pre-firmadas**: Durante la carga de la página inicial, evitando intercepción
+- ✅ **Mejora performance**: CDN edge locations distribuyen el contenido globalmente
+- ✅ **Incluido en AWS Free Tier**: 1TB/mes de transferencia, 10M requests
+- ✅ **TLS 1.2+**: Protocolo de seguridad moderno con certificado ACM
+
+**⚠️ Problema de seguridad sin CloudFront:**
+- S3 Static Website Hosting **NO soporta HTTPS nativo**
+- El HTML se sirve por `http://up.domain.com` (sin cifrar)
+- Un atacante MITM puede interceptar el HTML y **capturar la presigned URL**
+- Aunque la subida a S3 usa HTTPS, la exposición inicial es vulnerable
+
 ### Implementadas:
 
-1. **URLs Pre-firmadas**: Scope limitado a operación PUT únicamente
-2. **Expiración Temporal**: Todas las URLs expiran (TTL configurable)
-3. **Sin Credenciales Expuestas**: Ningún código contiene credenciales hardcoded
-4. **CORS Configurado**: Solo orígenes permitidos pueden hacer uploads
-5. **Validación de Tamaño**: Límite de tamaño máximo configurado
-6. **Prefijos Aislados**: Contenido separado en `inbox/` y `u/`
-7. **Lifecycle Automático**: Las páginas HTML se eliminan después de 7 días
-8. **Encriptación**: El bucket de almacenamiento usa encriptación en reposo
+1. **HTTPS End-to-End**: CloudFront con certificado SSL/TLS (cuando se usa dominio)
+2. **URLs Pre-firmadas**: Scope limitado a operación PUT únicamente
+3. **Expiración Temporal**: Todas las URLs expiran (TTL configurable)
+4. **Sin Credenciales Expuestas**: Ningún código contiene credenciales hardcoded
+5. **CORS Configurado**: Solo orígenes permitidos pueden hacer uploads
+6. **Validación de Tamaño**: Límite de tamaño máximo configurado
+7. **Prefijos Aislados**: Contenido separado en `inbox/` y `u/`
+8. **Lifecycle Automático**: Las páginas HTML se eliminan después de 7 días
+9. **Encriptación**: El bucket de almacenamiento usa encriptación en reposo
 
 ### Recomendaciones Adicionales:
 
