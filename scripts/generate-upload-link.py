@@ -17,6 +17,7 @@ from pathlib import Path
 from typing import Optional
 
 import boto3
+from botocore.client import Config
 from botocore.exceptions import ClientError, NoCredentialsError
 
 
@@ -278,7 +279,11 @@ def main():
     
     # Inicializar cliente de S3
     try:
-        s3_client = boto3.client('s3', region_name=args.region)
+        s3_client = boto3.client(
+            's3',
+            region_name=args.region,
+            config=Config(signature_version='s3v4')
+        )
     except NoCredentialsError:
         print("❌ Error: No se encontraron credenciales de AWS", file=sys.stderr)
         print("Configure credenciales con: aws configure", file=sys.stderr)
