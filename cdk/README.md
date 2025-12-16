@@ -69,6 +69,7 @@ cdk deploy
 ```bash
 cdk deploy \
   -c domain=up.mydomain.com \
+  -c storageBucketName=my-storage-bucket \
   -c hostedZoneId=Z1234567890ABC \
   -c hostedZoneName=mydomain.com \
   -c certificateArn=arn:aws:acm:us-east-1:123456789012:certificate/abc-123
@@ -81,6 +82,7 @@ cdk deploy \
 ```bash
 cdk deploy \
   -c domain=up.mydomain.com \
+  -c storageBucketName=my-storage-bucket \
   -c hostedZoneId=Z1234567890ABC \
   -c hostedZoneName=mydomain.com
 ```
@@ -95,6 +97,7 @@ El stack creará un certificado ACM nuevo con validación DNS automática.
 
 #### Parámetros:
 - `domain`: Subdominio completo para el hosting bucket (ej: `up.mydomain.com`)
+- `storageBucketName` (opcional): Nombre personalizado para el bucket de almacenamiento (ej: `my-storage-bucket`). Si no se especifica, CDK genera un nombre automático.
 - `hostedZoneId`: ID de la Hosted Zone en Route53
 - `hostedZoneName`: Nombre de la zona DNS (ej: `mydomain.com`)
 - `certificateArn` (opcional): ARN de certificado ACM existente en us-east-1
