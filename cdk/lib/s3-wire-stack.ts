@@ -59,6 +59,14 @@ export class S3WireStack extends cdk.Stack {
       // Reglas de lifecycle
       lifecycleRules: [
         {
+          // Eliminar archivos en inbox/ después de 7 días
+          id: 'expire-inbox',
+          prefix: 'inbox/',
+          expiration: cdk.Duration.days(7),
+          abortIncompleteMultipartUploadAfter: cdk.Duration.days(1),
+          enabled: true,
+        },
+        {
           // Opcional: transición de archivos en inbox/ a Glacier después de 30 días
           id: 'TransitionToGlacier',
           prefix: 'inbox/',
@@ -68,7 +76,7 @@ export class S3WireStack extends cdk.Stack {
               transitionAfter: cdk.Duration.days(30),
             },
           ],
-          enabled: true,
+          enabled: false,  // Deshabilitado porque ya expiramos a los 7 días
         },
       ],
     });
@@ -118,10 +126,19 @@ export class S3WireStack extends cdk.Stack {
       // Reglas de lifecycle para eliminar páginas HTML efímeras
       lifecycleRules: [
         {
-          // Eliminar automáticamente objetos en u/ después de 7 días
-          id: 'DeleteEphemeralPages',
+          // Eliminar automáticamente objetos en u/ después de 1 día
+          id: 'expire-upload-pages',
           prefix: 'u/',
-          expiration: cdk.Duration.days(7),
+          expiration: cdk.Duration.days(1),
+          abortIncompleteMultipartUploadAfter: cdk.Duration.days(1),
+          enabled: true,
+        },
+        {
+          // Eliminar automáticamente objetos en s/ después de 2 días
+          id: 'expire-download-pages',
+          prefix: 's/',
+          expiration: cdk.Duration.days(2),
+          abortIncompleteMultipartUploadAfter: cdk.Duration.days(1),
           enabled: true,
         },
       ],
@@ -131,7 +148,7 @@ export class S3WireStack extends cdk.Stack {
     // Políticas de Bucket
     // ========================================
     
-    // Política para el bucket de hosting: permitir GetObject público solo en u/
+    // Política para el bucket de hosting: permitir GetObject público solo en u/ y s/
     this.hostingBucket.addToResourcePolicy(
       new iam.PolicyStatement({
         sid: 'PublicReadGetObject',
@@ -140,6 +157,7 @@ export class S3WireStack extends cdk.Stack {
         actions: ['s3:GetObject'],
         resources: [
           this.hostingBucket.arnForObjects('u/*'),
+          this.hostingBucket.arnForObjects('s/*'),
           this.hostingBucket.arnForObjects('index.html'),
           this.hostingBucket.arnForObjects('404.html'),
         ],
