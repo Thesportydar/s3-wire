@@ -113,6 +113,7 @@ cdk deploy
 # Opción 2: Con dominio personalizado y HTTPS usando certificado existente (RECOMENDADO)
 cdk deploy \
   -c domain=up.mydomain.com \
+  -c storageBucketName=my-storage-bucket \
   -c hostedZoneId=Z1234567890ABC \
   -c hostedZoneName=mydomain.com \
   -c certificateArn=arn:aws:acm:us-east-1:123456789012:certificate/abc-123
@@ -120,6 +121,7 @@ cdk deploy \
 # Opción 3: Con dominio personalizado y HTTPS - certificado nuevo
 cdk deploy \
   -c domain=up.mydomain.com \
+  -c storageBucketName=my-storage-bucket \
   -c hostedZoneId=Z1234567890ABC \
   -c hostedZoneName=mydomain.com
 ```
@@ -128,6 +130,7 @@ cdk deploy \
 - El certificado ACM para CloudFront **DEBE estar en us-east-1**
 - Cuando se especifica un `domain`, se crea CloudFront con HTTPS automáticamente
 - Sin `domain`, solo se despliega S3 Website Hosting (HTTP - no recomendado para producción)
+- Opcionalmente, usa `-c storageBucketName=nombre-bucket` para especificar un nombre personalizado para el bucket de almacenamiento
 - Si el stack está en una región diferente a us-east-1, proporcione un `certificateArn` existente en us-east-1
 
 ### 2. Bootstrap de CDK (primera vez)

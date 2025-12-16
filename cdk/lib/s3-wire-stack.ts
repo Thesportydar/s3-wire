@@ -24,7 +24,11 @@ export class S3WireStack extends cdk.Stack {
     // Bucket de Almacenamiento
     // ========================================
     // Este bucket almacena los archivos subidos por los usuarios en el prefijo inbox/
+    const storageBucketName = this.node.tryGetContext('storageBucketName');
+    
     this.storageBucket = new s3.Bucket(this, 'StorageBucket', {
+      bucketName: storageBucketName,
+      
       // Eliminar el bucket cuando se destruya el stack (útil para desarrollo)
       // En producción, cambiar a RETAIN
       removalPolicy: cdk.RemovalPolicy.DESTROY,
