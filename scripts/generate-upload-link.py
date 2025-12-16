@@ -9,10 +9,10 @@ y la sube al bucket de hosting estático.
 
 import argparse
 import os
-import random
+import secrets
 import string
 import sys
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Optional
 
@@ -32,7 +32,7 @@ TEMPLATE_FILE = TEMPLATE_DIR / 'upload-page.html'
 
 def generate_short_id(length: int = DEFAULT_SHORT_ID_LENGTH) -> str:
     """
-    Genera un identificador corto aleatorio usando base62.
+    Genera un identificador corto aleatorio usando base62 con secrets (cryptographically secure).
     
     Args:
         length: Longitud del identificador (default: 6)
@@ -40,7 +40,7 @@ def generate_short_id(length: int = DEFAULT_SHORT_ID_LENGTH) -> str:
     Returns:
         String aleatorio de la longitud especificada
     """
-    return ''.join(random.choices(BASE62_CHARSET, k=length))
+    return ''.join(secrets.choice(BASE62_CHARSET) for _ in range(length))
 
 
 def create_presigned_url(
@@ -274,8 +274,8 @@ def main():
     filename = args.filename or f'upload-{short_id}'
     object_key = f'inbox/{filename}'
     
-    # Calcular fecha de expiración
-    expiry_date = datetime.utcnow() + timedelta(seconds=args.ttl)
+    # Calcular fecha de expiración con timezone UTC
+    expiry_date = datetime.now(timezone.utc) + timedelta(seconds=args.ttl)
     
     # Inicializar cliente de S3
     try:

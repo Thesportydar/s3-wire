@@ -9,10 +9,10 @@ y la sube al bucket de hosting estático.
 
 import argparse
 import os
-import random
+import secrets
 import string
 import sys
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Optional
 
@@ -25,6 +25,7 @@ from botocore.exceptions import ClientError, NoCredentialsError
 BASE62_CHARSET = string.ascii_letters + string.digits  # a-zA-Z0-9
 DEFAULT_TTL = 21600  # 6 horas
 DEFAULT_SHORT_ID_LENGTH = 6
+EXPIRATION_FORMAT = '%Y-%m-%d %H:%M UTC'
 
 # Template HTML para página de descarga
 HTML_TEMPLATE = """<!DOCTYPE html>
@@ -162,7 +163,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 
 def generate_short_id(length: int = DEFAULT_SHORT_ID_LENGTH) -> str:
     """
-    Genera un identificador corto aleatorio usando base62.
+    Genera un identificador corto aleatorio usando base62 con secrets (cryptographically secure).
     
     Args:
         length: Longitud del identificador (default: 6)
@@ -170,7 +171,7 @@ def generate_short_id(length: int = DEFAULT_SHORT_ID_LENGTH) -> str:
     Returns:
         String aleatorio de la longitud especificada
     """
-    return ''.join(random.choices(BASE62_CHARSET, k=length))
+    return ''.join(secrets.choice(BASE62_CHARSET) for _ in range(length))
 
 
 def validate_file_exists(s3_client, bucket_name: str, object_key: str) -> bool:
@@ -243,7 +244,7 @@ def render_html_template(
     Returns:
         HTML renderizado
     """
-    expiration_str = expiry_date.strftime('%Y-%m-%d %H:%M UTC')
+    expiration_str = expiry_date.strftime(EXPIRATION_FORMAT)
     
     rendered = HTML_TEMPLATE.replace('{FILENAME}', filename)
     rendered = rendered.replace('{EXPIRATION_TIME}', expiration_str)
@@ -364,11 +365,11 @@ def main():
     """
     args = parse_arguments()
     
-    # Extraer nombre del archivo
-    filename = args.source_key.split('/')[-1]
+    # Extraer nombre del archivo usando Path para mayor robustez
+    filename = Path(args.source_key).name
     
-    # Calcular fecha de expiración
-    expiry_date = datetime.utcnow() + timedelta(seconds=args.ttl)
+    # Calcular fecha de expiración con timezone UTC
+    expiry_date = datetime.now(timezone.utc) + timedelta(seconds=args.ttl)
     
     # Inicializar cliente de S3
     try:
@@ -422,7 +423,7 @@ def main():
     
     # Construir URL completa
     short_url = f'{args.protocol}://{args.domain}/s/{short_id}/'
-    expiration_str = expiry_date.strftime('%Y-%m-%d %H:%M UTC')
+    expiration_str = expiry_date.strftime(EXPIRATION_FORMAT)
     
     # Mostrar resultado
     print("\n" + "=" * 60)
