@@ -23,7 +23,7 @@ from botocore.exceptions import ClientError, NoCredentialsError
 
 # Constantes
 BASE62_CHARSET = string.ascii_letters + string.digits  # a-zA-Z0-9
-DEFAULT_TTL = 86400  # 24 horas
+DEFAULT_TTL = 21600  # 6 horas
 DEFAULT_MAX_SIZE = 100 * 1024 * 1024  # 100 MB
 DEFAULT_SHORT_ID_LENGTH = 6
 TEMPLATE_DIR = Path(__file__).parent.parent / 'templates'
@@ -223,7 +223,7 @@ Ejemplos:
         '--ttl',
         type=int,
         default=DEFAULT_TTL,
-        help=f'Tiempo de vida en segundos (default: {DEFAULT_TTL} = 24h)'
+        help=f'Tiempo de vida en segundos (default: {DEFAULT_TTL} = 6 horas)'
     )
     
     parser.add_argument(

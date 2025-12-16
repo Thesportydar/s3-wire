@@ -1,16 +1,41 @@
 # Scripts de S3-Wire
 
-Este directorio contiene scripts para generar links temporales de upload.
+Este directorio contiene scripts para generar links temporales de upload y descarga.
 
 ## 📋 Descripción
 
-El script `generate-upload-link.py` automatiza el proceso de creación de links de upload:
+### generate-upload-link.py
+
+Genera links temporales para que terceros **suban** archivos a tu bucket S3.
+
+El script automatiza el proceso de creación de links de upload:
 
 1. Genera un ID corto aleatorio (base62)
 2. Crea una URL pre-firmada de S3 para permitir uploads
 3. Renderiza una página HTML desde el template
 4. Sube la página HTML al bucket de hosting
 5. Muestra el link completo para compartir
+
+### generate-download-link.py
+
+Genera links temporales para compartir archivos existentes mediante **descarga**.
+
+El script automatiza el proceso de creación de links de descarga:
+
+1. Valida que el archivo existe en S3
+2. Genera un ID corto aleatorio (base62)
+3. Crea una URL pre-firmada de S3 para permitir descargas
+4. Genera una página HTML con botón de descarga
+5. Sube la página HTML al bucket de hosting
+6. Muestra el link completo para compartir
+
+## Defaults de Seguridad
+
+- **TTL de presigned URLs**: 6 horas (21600s) por defecto
+- **Expiración de páginas de upload** (`/u/`): 1 día
+- **Expiración de páginas de descarga** (`/s/`): 2 días
+- **Expiración de archivos subidos** (`inbox/`): 7 días
+- Todos los links son de un solo uso efectivo
 
 ## 🚀 Instalación
 
@@ -30,7 +55,9 @@ pip install -r requirements.txt
 
 ## 📝 Uso
 
-### Sintaxis Básica
+### generate-upload-link.py
+
+#### Sintaxis Básica
 
 ```bash
 python generate-upload-link.py \
@@ -40,23 +67,50 @@ python generate-upload-link.py \
   [OPTIONS]
 ```
 
-### Parámetros Requeridos
+#### Parámetros Requeridos
 
 - `--domain`: Dominio del bucket de hosting (ej: `up.mydomain.com`)
 - `--storage-bucket`: Nombre del bucket de almacenamiento
 - `--hosting-bucket`: Nombre del bucket de hosting
 
-### Parámetros Opcionales
+#### Parámetros Opcionales
 
-- `--ttl`: Tiempo de vida en segundos (default: 86400 = 24 horas)
+- `--ttl`: Tiempo de vida en segundos (default: 21600 = 6 horas)
 - `--max-size`: Tamaño máximo en bytes (default: 104857600 = 100 MB)
 - `--allowed-types`: Tipos MIME permitidos separados por coma (default: `*/*`)
 - `--filename`: Nombre del archivo en S3 (default: auto-generado)
 - `--region`: Región de AWS (default: región por defecto de AWS CLI)
 
+### generate-download-link.py
+
+#### Sintaxis Básica
+
+```bash
+python generate-download-link.py \
+  --domain DOMAIN \
+  --source-bucket SOURCE_BUCKET \
+  --source-key SOURCE_KEY \
+  --hosting-bucket HOSTING_BUCKET \
+  [OPTIONS]
+```
+
+#### Parámetros Requeridos
+
+- `--domain`: Dominio del bucket de hosting (ej: `up.mydomain.com`)
+- `--source-bucket`: Bucket donde está el archivo a compartir
+- `--source-key`: Ruta completa del archivo en el bucket (ej: `documents/report.pdf`)
+- `--hosting-bucket`: Nombre del bucket de hosting (mismo que domain)
+
+#### Parámetros Opcionales
+
+- `--ttl`: Tiempo de vida en segundos (default: 21600 = 6 horas)
+- `--region`: Región de AWS (default: us-east-1)
+
 ## 📚 Ejemplos
 
-### Ejemplo 1: Uso Básico
+### Upload Links
+
+#### Ejemplo 1: Uso Básico
 
 ```bash
 python generate-upload-link.py \
@@ -68,12 +122,12 @@ python generate-upload-link.py \
 Output:
 ```
 ✅ Link generado exitosamente!
-🔗 Link de upload: http://up.mydomain.com/u/a3Xk9p/
+🔗 Link de upload: https://up.mydomain.com/u/a3Xk9p/
 ⏰ Válido hasta: 2024-01-16 14:30:00 UTC
 🆔 ID: a3Xk9p
 ```
 
-### Ejemplo 2: Solo Imágenes, 1 Hora
+#### Ejemplo 2: Solo Imágenes, 1 Hora
 
 ```bash
 python generate-upload-link.py \
@@ -84,7 +138,7 @@ python generate-upload-link.py \
   --allowed-types "image/*"
 ```
 
-### Ejemplo 3: PDF hasta 50MB
+#### Ejemplo 3: PDF hasta 50MB
 
 ```bash
 python generate-upload-link.py \
@@ -95,7 +149,7 @@ python generate-upload-link.py \
   --allowed-types "application/pdf"
 ```
 
-### Ejemplo 4: Múltiples Tipos
+#### Ejemplo 4: Múltiples Tipos
 
 ```bash
 python generate-upload-link.py \
@@ -103,6 +157,49 @@ python generate-upload-link.py \
   --storage-bucket my-storage-bucket \
   --hosting-bucket up.mydomain.com \
   --allowed-types "image/*,application/pdf,text/plain"
+```
+
+### Download Links
+
+#### Ejemplo 1: Compartir un PDF
+
+```bash
+python generate-download-link.py \
+  --domain up.mydomain.com \
+  --source-bucket my-documents \
+  --source-key reports/quarterly-report.pdf \
+  --hosting-bucket up.mydomain.com
+```
+
+Output:
+```
+✅ Download link created successfully!
+🔗 Short URL: https://up.mydomain.com/s/Xy9K2m/
+📄 File: quarterly-report.pdf
+⏰ Expires: 2025-12-17 02:30 UTC
+🆔 ID: Xy9K2m
+```
+
+#### Ejemplo 2: Compartir una Imagen con TTL Personalizado
+
+```bash
+python generate-download-link.py \
+  --domain up.mydomain.com \
+  --source-bucket my-photos \
+  --source-key vacation/beach.jpg \
+  --hosting-bucket up.mydomain.com \
+  --ttl 3600
+```
+
+#### Ejemplo 3: Archivo en Bucket con Región Específica
+
+```bash
+python generate-download-link.py \
+  --domain up.mydomain.com \
+  --source-bucket my-storage-west \
+  --source-key data/analysis.csv \
+  --hosting-bucket up.mydomain.com \
+  --region us-west-2
 ```
 
 ### Ejemplo 5: Nombre de Archivo Específico

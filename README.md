@@ -172,7 +172,7 @@ python generate-upload-link.py \
   --domain up.mydomain.com \
   --storage-bucket my-storage-bucket \
   --hosting-bucket up.mydomain.com \
-  --ttl 86400 \
+  --ttl 21600 \
   --max-size 104857600 \
   --allowed-types "image/*,application/pdf"
 ```
@@ -182,7 +182,7 @@ python generate-upload-link.py \
 - `--domain`: Dominio del bucket de hosting (ej: up.mydomain.com)
 - `--storage-bucket`: Nombre del bucket de almacenamiento
 - `--hosting-bucket`: Nombre del bucket de hosting
-- `--ttl`: Tiempo de vida de la URL en segundos (default: 86400 = 24h)
+- `--ttl`: Tiempo de vida de la URL en segundos (default: 21600 = 6h)
 - `--max-size`: Tamaño máximo de archivo en bytes (default: 100MB)
 - `--allowed-types`: Tipos MIME permitidos separados por coma
 
@@ -191,12 +191,48 @@ python generate-upload-link.py \
 ```
 ✓ Link generado exitosamente!
 
-Link de upload: http://up.mydomain.com/u/a3Xk9p/
+Link de upload: https://up.mydomain.com/u/a3Xk9p/
 Válido hasta: 2024-01-16 14:30:00 UTC
 ID: a3Xk9p
 
 Compartir este link con el usuario para que suba su archivo.
 ```
+
+### 📥 Generar Link de Descarga
+
+Para compartir archivos existentes en S3:
+
+```bash
+cd scripts
+
+python generate-download-link.py \
+  --domain up.yourdomain.com \
+  --source-bucket my-existing-bucket \
+  --source-key documents/report.pdf \
+  --hosting-bucket up.yourdomain.com
+
+# Output:
+# ✅ Download link created successfully!
+# 🔗 Short URL: https://up.yourdomain.com/s/aB3xK9/
+# 📄 File: report.pdf
+# ⏰ Expires: 2025-12-17 02:30 UTC
+```
+
+#### Parámetros
+
+- `--domain`: Dominio del hosting bucket (ej: `up.yourdomain.com`)
+- `--source-bucket`: Bucket donde está el archivo a compartir
+- `--source-key`: Ruta completa del archivo en el bucket
+- `--hosting-bucket`: Bucket de hosting (mismo que domain)
+- `--ttl`: (Opcional) Tiempo de validez en segundos (default: 21600 = 6h)
+- `--region`: (Opcional) Región AWS (default: us-east-1)
+
+### Lifecycle y Expiración
+
+- **Presigned URLs**: 6 horas por defecto (configurable con `--ttl`)
+- **Páginas de upload** (`/u/`): 1 día
+- **Páginas de descarga** (`/s/`): 2 días
+- **Archivos subidos** (`inbox/`): 7 días
 
 ### Compartir el Link
 
