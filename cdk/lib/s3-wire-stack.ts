@@ -3,6 +3,9 @@ import { Construct } from 'constructs';
 import * as s3 from 'aws-cdk-lib/aws-s3';
 import * as iam from 'aws-cdk-lib/aws-iam';
 import * as route53 from 'aws-cdk-lib/aws-route53';
+import * as cloudfront from 'aws-cdk-lib/aws-cloudfront';
+import * as acm from 'aws-cdk-lib/aws-certificatemanager';
+import * as targets from 'aws-cdk-lib/aws-route53-targets';
 
 export interface S3WireStackProps extends cdk.StackProps {
   domain?: string;
@@ -147,27 +150,98 @@ export class S3WireStack extends cdk.Stack {
     // Nota: Las URLs pre-firmadas usan las credenciales del firmante, no del bucket
     
     // ========================================
-    // Route53 (Opcional)
+    // CloudFront Distribution
     // ========================================
-    if (props?.hostedZoneId && props?.hostedZoneName && props?.domain) {
-      // Importar la Hosted Zone existente
-      const hostedZone = route53.HostedZone.fromHostedZoneAttributes(
-        this,
-        'HostedZone',
-        {
-          hostedZoneId: props.hostedZoneId,
-          zoneName: props.hostedZoneName,
+    
+    let distribution: cloudfront.CloudFrontWebDistribution | undefined;
+    
+    if (props?.domain) {
+      // Obtener parámetro opcional: ARN de certificado ACM existente
+      const certificateArn = this.node.tryGetContext('certificateArn');
+      
+      let certificate: acm.ICertificate;
+      
+      if (certificateArn) {
+        // Usar certificado existente (ej: wildcard *.inaquipaladino.com)
+        certificate = acm.Certificate.fromCertificateArn(
+          this,
+          'ExistingCertificate',
+          certificateArn
+        );
+      } else {
+        // Crear nuevo certificado con validación DNS
+        // IMPORTANTE: El certificado ACM para CloudFront DEBE estar en us-east-1
+        if (props.hostedZoneId && props.hostedZoneName) {
+          const hostedZone = route53.HostedZone.fromHostedZoneAttributes(
+            this,
+            'HostedZone',
+            {
+              hostedZoneId: props.hostedZoneId,
+              zoneName: props.hostedZoneName,
+            }
+          );
+          
+          certificate = new acm.Certificate(this, 'Certificate', {
+            domainName: props.domain,
+            validation: acm.CertificateValidation.fromDns(hostedZone),
+          });
+        } else {
+          throw new Error(
+            'Para crear un certificado automáticamente, se requieren hostedZoneId y hostedZoneName. ' +
+            'Alternativamente, proporciona un certificateArn existente.'
+          );
         }
-      );
-
-      // Crear registro A Alias apuntando al S3 Website Endpoint
-      // Nota: Para Route53, necesitamos usar un Custom Resource o configurar manualmente
-      // debido a limitaciones de CDK con S3 Website Hosting
-      // Por ahora, documentamos el dominio del bucket en los outputs para configuración manual
-      new cdk.CfnOutput(this, 'Route53Instructions', {
-        value: `Crea un registro CNAME en Route53 apuntando ${props.domain} a ${this.hostingBucket.bucketWebsiteDomainName}`,
-        description: 'Instrucciones para configurar Route53 manualmente',
+      }
+      
+      // Crear CloudFront Distribution
+      distribution = new cloudfront.CloudFrontWebDistribution(this, 'Distribution', {
+        originConfigs: [{
+          customOriginSource: {
+            domainName: this.hostingBucket.bucketWebsiteDomainName,
+            originProtocolPolicy: cloudfront.OriginProtocolPolicy.HTTP_ONLY,
+          },
+          behaviors: [{
+            isDefaultBehavior: true,
+            compress: true,
+            viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
+          }],
+        }],
+        viewerCertificate: cloudfront.ViewerCertificate.fromAcmCertificate(certificate, {
+          aliases: [props.domain],
+          securityPolicy: cloudfront.SecurityPolicyProtocol.TLS_V1_2_2021,
+          sslMethod: cloudfront.SSLMethod.SNI,
+        }),
+        errorConfigurations: [{
+          errorCode: 404,
+          responseCode: 404,
+          responsePagePath: '/404.html',
+        }],
+        comment: `S3-Wire CloudFront distribution for ${props.domain}`,
       });
+      
+      // ========================================
+      // Route53 (Opcional)
+      // ========================================
+      if (props.hostedZoneId && props.hostedZoneName) {
+        // Importar la Hosted Zone existente
+        const hostedZone = route53.HostedZone.fromHostedZoneAttributes(
+          this,
+          'HostedZoneForRecord',
+          {
+            hostedZoneId: props.hostedZoneId,
+            zoneName: props.hostedZoneName,
+          }
+        );
+
+        // Crear registro A Alias apuntando a CloudFront
+        new route53.ARecord(this, 'AliasRecord', {
+          zone: hostedZone,
+          recordName: props.domain,
+          target: route53.RecordTarget.fromAlias(
+            new targets.CloudFrontTarget(distribution)
+          ),
+        });
+      }
     }
 
     // ========================================
@@ -185,11 +259,31 @@ export class S3WireStack extends cdk.Stack {
       exportName: 'S3Wire-HostingBucketName',
     });
 
-    new cdk.CfnOutput(this, 'WebsiteURL', {
-      value: this.hostingBucket.bucketWebsiteUrl,
-      description: 'URL del sitio web estático',
-      exportName: 'S3Wire-WebsiteURL',
-    });
+    if (distribution && props?.domain) {
+      // Outputs para CloudFront
+      new cdk.CfnOutput(this, 'CloudFrontDistributionId', {
+        value: distribution.distributionId,
+        description: 'CloudFront Distribution ID',
+      });
+
+      new cdk.CfnOutput(this, 'CloudFrontDomainName', {
+        value: distribution.distributionDomainName,
+        description: 'CloudFront Domain Name',
+      });
+
+      new cdk.CfnOutput(this, 'WebsiteURL', {
+        value: `https://${props.domain}`,
+        description: 'Website URL with HTTPS',
+        exportName: 'S3Wire-WebsiteURL',
+      });
+    } else {
+      // Outputs para S3 Website (sin CloudFront)
+      new cdk.CfnOutput(this, 'WebsiteURL', {
+        value: this.hostingBucket.bucketWebsiteUrl,
+        description: 'URL del sitio web estático',
+        exportName: 'S3Wire-WebsiteURL',
+      });
+    }
 
     new cdk.CfnOutput(this, 'HostingBucketDomain', {
       value: this.hostingBucket.bucketWebsiteDomainName,
