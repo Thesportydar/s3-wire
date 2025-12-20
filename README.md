@@ -260,6 +260,43 @@ aws s3 cp s3://STORAGE-BUCKET/inbox/archivo.pdf ./
 
 ## 🔐 Consideraciones de Seguridad
 
+## 🔒 Seguridad y Privacidad
+
+### Camuflaje de file-sharing
+
+El sitio está diseñado para **no revelar su propósito** ante accesos no autorizados:
+
+- **Root domain** (`https://up.yourdomain.com/`): Muestra un reloj UTC simple
+- **URLs inválidas/expiradas**: Todas retornan el mismo reloj UTC con código 200
+- **Links válidos**: Incluyen meta tags `noindex/nofollow` para evitar indexación
+
+**Comportamiento:**
+```
+/                    → Reloj UTC (200 OK)
+/random-path         → Reloj UTC (200 OK)
+/u/invalid-id/       → Reloj UTC (200 OK)
+/u/VALID123/         → Upload page (200 OK, si existe)
+/s/VALID456/         → Download page (200 OK, si existe)
+```
+
+No hay forma de distinguir entre "link inválido" y "página normal" sin conocer el ID exacto.
+
+### Protección anti-crawling
+
+Todos los templates incluyen:
+- `noindex`: No indexar en buscadores
+- `nofollow`: No seguir links
+- `noarchive`: No cachear la página
+- `nosnippet`: No mostrar previews
+
+### TTL y expiración
+
+- Presigned URLs: **6 horas** por defecto
+- Páginas HTML: Se limpian automáticamente vía lifecycle rules
+- Archivos subidos: Permanecen 7 días en `inbox/`
+
+## 🔐 Consideraciones de Seguridad
+
 ### 🔒 Mejora de Seguridad: HTTPS con CloudFront
 
 Cuando se despliega con un dominio personalizado, CloudFront proporciona **HTTPS end-to-end**:
