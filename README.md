@@ -258,8 +258,6 @@ aws s3 ls s3://STORAGE-BUCKET/inbox/
 aws s3 cp s3://STORAGE-BUCKET/inbox/archivo.pdf ./
 ```
 
-## 🔐 Consideraciones de Seguridad
-
 ## 🔒 Seguridad y Privacidad
 
 ### Camuflaje de file-sharing
@@ -295,9 +293,7 @@ Todos los templates incluyen:
 - Páginas HTML: Se limpian automáticamente vía lifecycle rules
 - Archivos subidos: Permanecen 7 días en `inbox/`
 
-## 🔐 Consideraciones de Seguridad
-
-### 🔒 Mejora de Seguridad: HTTPS con CloudFront
+### Mejora de Seguridad: HTTPS con CloudFront
 
 Cuando se despliega con un dominio personalizado, CloudFront proporciona **HTTPS end-to-end**:
 
