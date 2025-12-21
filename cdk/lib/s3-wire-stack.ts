@@ -99,7 +99,6 @@ export class S3WireStack extends cdk.Stack {
       
       // Configuración de Static Website Hosting
       websiteIndexDocument: 'index.html',
-      websiteErrorDocument: '404.html',
       
       // Permitir acceso público para lectura de objetos específicos
       publicReadAccess: false, // Lo configuraremos con política más específica
@@ -159,7 +158,6 @@ export class S3WireStack extends cdk.Stack {
           this.hostingBucket.arnForObjects('u/*'),
           this.hostingBucket.arnForObjects('s/*'),
           this.hostingBucket.arnForObjects('index.html'),
-          this.hostingBucket.arnForObjects('404.html'),
         ],
       })
     );
@@ -237,11 +235,20 @@ export class S3WireStack extends cdk.Stack {
           securityPolicy: cloudfront.SecurityPolicyProtocol.TLS_V1_2_2021,
           sslMethod: cloudfront.SSLMethod.SNI,
         }),
-        errorConfigurations: [{
-          errorCode: 404,
-          responseCode: 404,
-          responsePagePath: '/404.html',
-        }],
+        errorConfigurations: [
+          {
+            errorCode: 403,
+            responseCode: 200,
+            responsePagePath: '/index.html',
+            errorCachingMinTtl: 300,
+          },
+          {
+            errorCode: 404,
+            responseCode: 200,
+            responsePagePath: '/index.html',
+            errorCachingMinTtl: 300,
+          },
+        ],
         comment: `S3-Wire CloudFront distribution for ${props.domain}`,
       });
       
