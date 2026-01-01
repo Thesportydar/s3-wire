@@ -4,6 +4,7 @@ import * as s3 from 'aws-cdk-lib/aws-s3';
 import * as iam from 'aws-cdk-lib/aws-iam';
 import * as route53 from 'aws-cdk-lib/aws-route53';
 import * as cloudfront from 'aws-cdk-lib/aws-cloudfront';
+import * as origins from 'aws-cdk-lib/aws-cloudfront-origins';
 import * as acm from 'aws-cdk-lib/aws-certificatemanager';
 import * as targets from 'aws-cdk-lib/aws-route53-targets';
 
@@ -173,7 +174,7 @@ export class S3WireStack extends cdk.Stack {
     // CloudFront Distribution
     // ========================================
     
-    let distribution: cloudfront.CloudFrontWebDistribution | undefined;
+    let distribution: cloudfront.Distribution | undefined;
     
     if (props?.domain) {
       // Obtener parámetro opcional: ARN de certificado ACM existente
@@ -218,35 +219,35 @@ export class S3WireStack extends cdk.Stack {
       }
       
       // Crear CloudFront Distribution
-      distribution = new cloudfront.CloudFrontWebDistribution(this, 'Distribution', {
-        originConfigs: [{
-          customOriginSource: {
-            domainName: this.hostingBucket.bucketWebsiteDomainName,
-            originProtocolPolicy: cloudfront.OriginProtocolPolicy.HTTP_ONLY,
-          },
-          behaviors: [{
-            isDefaultBehavior: true,
-            compress: true,
-            viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
-          }],
-        }],
-        viewerCertificate: cloudfront.ViewerCertificate.fromAcmCertificate(certificate, {
-          aliases: [props.domain],
-          securityPolicy: cloudfront.SecurityPolicyProtocol.TLS_V1_2_2021,
-          sslMethod: cloudfront.SSLMethod.SNI,
-        }),
-        errorConfigurations: [
+      // Configurar origin usando HttpOrigin para S3 Website Endpoint
+      const s3Origin = new origins.HttpOrigin(
+        this.hostingBucket.bucketWebsiteDomainName,
+        {
+          protocolPolicy: cloudfront.OriginProtocolPolicy.HTTP_ONLY,
+        }
+      );
+      
+      distribution = new cloudfront.Distribution(this, 'Distribution', {
+        defaultBehavior: {
+          origin: s3Origin,
+          viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
+          cachePolicy: cloudfront.CachePolicy.CACHING_OPTIMIZED,
+          compress: true,
+        },
+        certificate: certificate,
+        domainNames: [props.domain],
+        errorResponses: [
           {
-            errorCode: 403,
-            responseCode: 200,
+            httpStatus: 403,
+            responseHttpStatus: 200,
             responsePagePath: '/index.html',
-            errorCachingMinTtl: 300,
+            ttl: cdk.Duration.seconds(300),
           },
           {
-            errorCode: 404,
-            responseCode: 200,
+            httpStatus: 404,
+            responseHttpStatus: 200,
             responsePagePath: '/index.html',
-            errorCachingMinTtl: 300,
+            ttl: cdk.Duration.seconds(300),
           },
         ],
         comment: `S3-Wire CloudFront distribution for ${props.domain}`,
